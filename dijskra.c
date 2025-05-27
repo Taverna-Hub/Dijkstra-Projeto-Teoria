@@ -215,6 +215,13 @@ int load_graph_from_json(const char *filename, Graph *g)
     if (!root)
         return 0;
 
+    int directed = 1;
+    cJSON *directed_item = cJSON_GetObjectItem(root, "directed");
+    if (directed_item && cJSON_IsBool(directed_item))
+        directed = cJSON_IsTrue(directed_item);
+    else if (directed_item && cJSON_IsNumber(directed_item))
+        directed = directed_item->valueint;
+
     cJSON *nodes = cJSON_GetObjectItem(root, "nodes");
     cJSON *links = cJSON_GetObjectItem(root, "links");
     if (!cJSON_IsArray(nodes) || !cJSON_IsArray(links))
@@ -244,19 +251,38 @@ int load_graph_from_json(const char *filename, Graph *g)
         int u = id_to_index(id_to_idx, n, src);
         int v = id_to_index(id_to_idx, n, tgt);
         if (u >= 0 && v >= 0)
+        {
             add_edge(g, u, v, w);
+            if (!directed)
+                add_edge(g, v, u, w); // Adiciona aresta inversa se não-direcionado
+
+            printf("Edging %d\n", src);
+        }
     }
     free(id_to_idx);
     cJSON_Delete(root);
     return 1;
 }
 
+void gerar_grafo_completo(Graph *g, int n, int peso)
+{
+    init_graph(g, n);
+    for (int u = 0; u < n; u++)
+    {
+        for (int v = u + 1; v < n; v++)
+        {
+            add_edge(g, u, v, peso);
+            add_edge(g, v, u, peso); // Não-direcionado
+        }
+    }
+}
+
 void limpar_terminal()
 {
 #ifdef _WIN32
-    system("cls");
+    // system("cls");
 #else
-    system("clear");
+    // system("clear");
 #endif
 }
 
@@ -306,8 +332,9 @@ int main()
             nome_grafo = "🟢 Pequeno (Caso médio)";
             break;
         case 3:
-            arquivo = "Graphs/grafo_P_pior.json";
             nome_grafo = "🟢 Pequeno (Pior caso)";
+            gerar_grafo_completo(&g, 500, 1);
+            arquivo = NULL;
             break;
         case 4:
             arquivo = "Graphs/grafo_M_melhor.json";
@@ -318,8 +345,9 @@ int main()
             nome_grafo = "🟡 Médio (Caso médio)";
             break;
         case 6:
-            arquivo = "Graphs/grafo_M_pior.json";
             nome_grafo = "🟡 Médio (Pior caso)";
+            gerar_grafo_completo(&g, 1000, 1);
+            arquivo = NULL;
             break;
         case 7:
             arquivo = "Graphs/grafo_G_melhor.json";
@@ -330,18 +358,22 @@ int main()
             nome_grafo = "🔴 Grande (Caso médio)";
             break;
         case 9:
-            arquivo = "Graphs/grafo_G_pior.json";
             nome_grafo = "🔴 Grande (Pior caso)";
+            gerar_grafo_completo(&g, 5000, 1);
+            arquivo = NULL;
             break;
         default:
             printf("Opção inválida!\n");
             continue;
         }
 
-        if (!load_graph_from_json(arquivo, &g))
+        if (arquivo != NULL)
         {
-            fprintf(stderr, "Erro ao carregar o grafo %s\n", nome_grafo);
-            continue;
+            if (!load_graph_from_json(arquivo, &g))
+            {
+                fprintf(stderr, "Erro ao carregar o grafo %s\n", nome_grafo);
+                continue;
+            }
         }
 
         int rep = 30;
