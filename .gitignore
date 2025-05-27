@@ -1,3 +1,8 @@
 venv
+grafo
+.venv
+
+Graphs/grafo_G_pior.json
+dijskra
 *.exe
 .vscode/

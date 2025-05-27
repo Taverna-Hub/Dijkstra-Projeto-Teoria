@@ -3,6 +3,7 @@
 #include <limits.h>
 #include <time.h>
 #include <math.h>
+#include "cJSON.h"
 
 #define INF INT_MAX
 
@@ -147,28 +148,79 @@ double stddev(double* arr, int n, double m) {
     return sqrt(s / n);
 }
 
+// Função utilitária para ler todo o conteúdo de um arquivo para um buffer
+char* read_file_to_buffer(const char* filename) {
+    FILE* f = fopen(filename, "rb");
+    if (!f) return NULL;
+    fseek(f, 0, SEEK_END);
+    long len = ftell(f);
+    rewind(f);
+    char* buf = malloc(len + 1);
+    if (!buf) { fclose(f); return NULL; }
+    fread(buf, 1, len, f);
+    buf[len] = '\0';
+    fclose(f);
+    return buf;
+}
+
+// Carrega grafo no formato node-link do NetworkX
+static int id_to_index(int* id_to_idx, int n, int id) {
+    for (int i = 0; i < n; i++) if (id_to_idx[i] == id) return i;
+    return -1;
+}
+
+int load_graph_from_json(const char* filename, Graph* g) {
+    char* buffer = read_file_to_buffer(filename);
+    if (!buffer) return 0;
+    cJSON* root = cJSON_Parse(buffer);
+    free(buffer);
+    if (!root) return 0;
+
+    cJSON* nodes = cJSON_GetObjectItem(root, "nodes");
+    cJSON* links = cJSON_GetObjectItem(root, "links");
+    if (!cJSON_IsArray(nodes) || !cJSON_IsArray(links)) {
+        cJSON_Delete(root);
+        return 0;
+    }
+    int n = cJSON_GetArraySize(nodes);
+    init_graph(g, n);
+
+    int* id_to_idx = malloc(sizeof(int) * n);
+    for (int i = 0; i < n; i++) {
+        cJSON* node = cJSON_GetArrayItem(nodes, i);
+        int id = cJSON_GetObjectItem(node, "id")->valueint;
+        id_to_idx[i] = id;
+    }
+    for (int i = 0; i < cJSON_GetArraySize(links); i++) {
+        cJSON* link = cJSON_GetArrayItem(links, i);
+        int src = cJSON_GetObjectItem(link, "source")->valueint;
+        int tgt = cJSON_GetObjectItem(link, "target")->valueint;
+        int w = 1;
+        cJSON* weight = cJSON_GetObjectItem(link, "weight");
+        if (weight && cJSON_IsNumber(weight)) w = weight->valueint;
+        int u = id_to_index(id_to_idx, n, src);
+        int v = id_to_index(id_to_idx, n, tgt);
+        if (u >= 0 && v >= 0) add_edge(g, u, v, w);
+    }
+    free(id_to_idx);
+    cJSON_Delete(root);
+    return 1;
+}
+
 int main() {
-    Graph pequeno;
-    init_graph(&pequeno, 1000);
-    for(int i = 0; i < 999; i++) {
-        add_edge(&pequeno, i, i+1, 1);
-        add_edge(&pequeno, i+1, i, 1);
+    Graph pequeno, medio, grande;
+    if (!load_graph_from_json("Graphs/grafo_P_melhor.json", &pequeno)) {
+        fprintf(stderr, "Erro ao carregar grafo pequeno\n");
+        return 1;
     }
-
-    Graph medio;
-    init_graph(&medio, 10000);
-    for(int i = 0; i < 9999; i++) {
-        add_edge(&medio, i, i+1, 1);
-        add_edge(&medio, i+1, i, 1);
+    if (!load_graph_from_json("Graphs/grafo_M_melhor.json", &medio)) {
+        fprintf(stderr, "Erro ao carregar grafo medio\n");
+        return 1;
     }
-
-    Graph grande;
-    init_graph(&grande, 100000);
-    for(int i = 0; i < 99999; i++) {
-        add_edge(&grande, i, i+1, 1);
-        add_edge(&grande, i+1, i, 1);
+    if (!load_graph_from_json("Graphs/grafo_G_melhor.json", &grande)) {
+        fprintf(stderr, "Erro ao carregar grafo grande\n");
+        return 1;
     }
-
     Graph grafos[] = {pequeno, medio, grande};
     const char* nomes[] = {"🟢 Pequeno", "🟡 Médio", "🔴 Grande"};
     int rep = 30; 
