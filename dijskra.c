@@ -3,6 +3,7 @@
 #include <limits.h>
 #include <time.h>
 #include <math.h>
+#include <string.h>
 #include "cJSON.h"
 
 #define INF INT_MAX
@@ -277,12 +278,88 @@ void gerar_grafo_completo(Graph *g, int n, int peso)
     }
 }
 
+void salvar_resultado_csv(const char *filename, const char *tamanho, const char *caso, double media, double maximo, double minimo, double total, double desvio)
+{
+    FILE *f = fopen(filename, "r");
+    char linhas[100][512];
+    int n = 0, found = 0, header_written = 0;
+    if (f)
+    {
+        while (fgets(linhas[n], sizeof(linhas[n]), f) && n < 100)
+        {
+            if (n == 0 && strstr(linhas[0], "Tamanho,Caso"))
+            {
+                header_written = 1;
+            }
+            else if (n == 0)
+            {
+                header_written = 0;
+            }
+
+            // verifica se já existe a linha para tamanho/caso
+            if (n > 0 || (n == 0 && !header_written))
+            {
+                char t[32], c[32];
+                sscanf(linhas[n], "%31[^,],%31[^,]", t, c);
+                if (strcmp(t, tamanho) == 0 && strcmp(c, caso) == 0)
+                {
+                    snprintf(linhas[n], sizeof(linhas[n]), "%s,%s,%.6f,%.6f,%.6f,%.6f,%.6f\n", tamanho, caso, media, maximo, minimo, total, desvio);
+                    found = 1;
+                }
+            }
+            n++;
+        }
+        fclose(f);
+    }
+    if (!header_written)
+    {
+        strcpy(linhas[0], "Tamanho,Caso,Tempo médio,Tempo máximo,Tempo mínimo,Tempo total,Desvio padrão\n");
+        n = n == 0 ? 1 : n;
+        header_written = 1;
+    }
+    if (!found)
+    {
+        snprintf(linhas[n], sizeof(linhas[n]), "%s,%s,%.6f,%.6f,%.6f,%.6f,%.6f\n", tamanho, caso, media, maximo, minimo, total, desvio);
+        n++;
+    }
+
+    // remove duplicatas (mantém só a última ocorrência)
+    for (int i = 1; i < n - 1; i++)
+    {
+        char t1[32], c1[32], t2[32], c2[32];
+        sscanf(linhas[i], "%31[^,],%31[^,]", t1, c1);
+        for (int j = i + 1; j < n;)
+        {
+            sscanf(linhas[j], "%31[^,],%31[^,]", t2, c2);
+            if (strcmp(t1, t2) == 0 && strcmp(c1, c2) == 0)
+            {
+                // remove duplicata
+                for (int k = j; k < n - 1; k++)
+                    strcpy(linhas[k], linhas[k + 1]);
+                n--;
+            }
+            else
+            {
+                j++;
+            }
+        }
+    }
+
+    f = fopen(filename, "w");
+    if (f)
+    {
+        for (int i = 0; i < n; i++)
+            fputs(linhas[i], f);
+        fclose(f);
+    }
+}
+
 void limpar_terminal()
 {
 #ifdef _WIN32
-    // system("cls");
+    system("cls");
 #else
-    // system("clear");
+    system("clear");
 #endif
 }
 
@@ -403,6 +480,26 @@ int main()
 
         double m = mean(tempos, rep);
         double s = stddev(tempos, rep, m);
+
+        double maximo = t_max;
+        double minimo = t_min;
+        double total = t_total;
+        const char *tamanho = NULL;
+        const char *caso = NULL;
+        if (strstr(nome_grafo, "Pequeno"))
+            tamanho = "Pequeno";
+        else if (strstr(nome_grafo, "Médio"))
+            tamanho = "Médio";
+        else if (strstr(nome_grafo, "Grande"))
+            tamanho = "Grande";
+        if (strstr(nome_grafo, "Melhor"))
+            caso = "Melhor";
+        else if (strstr(nome_grafo, "médio"))
+            caso = "Médio";
+        else if (strstr(nome_grafo, "Pior"))
+            caso = "Pior";
+        salvar_resultado_csv("resultados_dijkstra.csv", tamanho, caso, m, maximo, minimo, total, s);
+
         printf("📊 Tempo médio: %.6f s, Desvio padrão: %.6f s\n", m, s);
         printf("⏱️ Tempo máximo: %.6f s, Tempo mínimo: %.6f s, Tempo total: %.6f s\n\n", t_max, t_min, t_total);
 

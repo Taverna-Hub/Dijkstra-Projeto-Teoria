@@ -5,4 +5,6 @@ grafo
 Graphs/grafo_G_pior.json
 dijskra
 *.exe
+*.csv
+*.xlsx
 .vscode/
