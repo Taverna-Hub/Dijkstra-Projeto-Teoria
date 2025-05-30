@@ -5,6 +5,15 @@
 #include <math.h>
 #include <string.h>
 #include "cJSON.h"
+#include <unistd.h>
+#ifdef __linux__
+#ifndef CLOCK_MONOTONIC
+#define CLOCK_MONOTONIC 1
+#endif
+#include <time.h>
+#else
+#include <sys/time.h>
+#endif
 
 #define INF INT_MAX
 
@@ -354,6 +363,43 @@ void salvar_resultado_csv(const char *filename, const char *tamanho, const char 
     }
 }
 
+void salvar_tempos_individuais_csv(const char *filename, const char *tamanho, const char *caso, double *tempos, int rep)
+{
+    FILE *f = fopen(filename, "r");
+    char linhas[10000][128];
+    int n = 0;
+    int header_found = 0;
+    if (f)
+    {
+        while (fgets(linhas[n], sizeof(linhas[n]), f) && n < 10000)
+            n++;
+        fclose(f);
+    }
+    // Sempre escreva o header na primeira linha
+    int m = 0;
+    strcpy(linhas[m++], "Tamanho,Caso,Execucao,Tempo (s)\n");
+    // Copia apenas as linhas que não são do mesmo tamanho/caso e não são header
+    for (int i = 0; i < n; i++)
+    {
+        if (strstr(linhas[i], "Tamanho,Caso"))
+            continue;
+        char t[32], c[32];
+        int exec;
+        sscanf(linhas[i], "%31[^,],%31[^,],%d", t, c, &exec);
+        if (!(strcmp(t, tamanho) == 0 && strcmp(c, caso) == 0))
+            strcpy(linhas[m++], linhas[i]);
+    }
+    f = fopen(filename, "w");
+    if (f)
+    {
+        for (int i = 0; i < m; i++)
+            fputs(linhas[i], f);
+        for (int i = 0; i < rep; i++)
+            fprintf(f, "%s,%s,%d,%.8f\n", tamanho, caso, i + 1, tempos[i]);
+        fclose(f);
+    }
+}
+
 void limpar_terminal()
 {
 #ifdef _WIN32
@@ -458,32 +504,7 @@ int main()
         double *tempos = malloc(rep * sizeof(double));
         double t_max = 0.0, t_min = 1e9, t_total = 0.0;
 
-        for (int i = 0; i < rep; i++)
-        {
-            struct timespec start, end;
-            clock_gettime(CLOCK_MONOTONIC, &start);
-
-            int *dist = dijkstra(&g, 0);
-
-            clock_gettime(CLOCK_MONOTONIC, &end);
-            free(dist);
-
-            tempos[i] = (end.tv_sec - start.tv_sec) + (end.tv_nsec - start.tv_nsec) / 1e9;
-            printf("  🔄 Repetição %2d: %.6f segundos\n", i + 1, tempos[i]);
-
-            if (tempos[i] > t_max)
-                t_max = tempos[i];
-            if (tempos[i] < t_min)
-                t_min = tempos[i];
-            t_total += tempos[i];
-        }
-
-        double m = mean(tempos, rep);
-        double s = stddev(tempos, rep, m);
-
-        double maximo = t_max;
-        double minimo = t_min;
-        double total = t_total;
+        // Determinar tamanho e caso antes do loop de repetição
         const char *tamanho = NULL;
         const char *caso = NULL;
         if (strstr(nome_grafo, "Pequeno"))
@@ -498,7 +519,43 @@ int main()
             caso = "Médio";
         else if (strstr(nome_grafo, "Pior"))
             caso = "Pior";
-        salvar_resultado_csv("resultados_dijkstra.csv", tamanho, caso, m, maximo, minimo, total, s);
+
+        for (int i = 0; i < rep; i++)
+        {
+#ifdef __linux__
+            struct timespec start, end;
+            clock_gettime(CLOCK_MONOTONIC, &start);
+#else
+            struct timeval start, end;
+            gettimeofday(&start, NULL);
+#endif
+            int *dist = dijkstra(&g, 0);
+#ifdef __linux__
+            clock_gettime(CLOCK_MONOTONIC, &end);
+            tempos[i] = (end.tv_sec - start.tv_sec) + (end.tv_nsec - start.tv_nsec) / 1e9;
+#else
+            gettimeofday(&end, NULL);
+            tempos[i] = (end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec) / 1e6;
+#endif
+            free(dist);
+            printf("  🔄 Repetição %2d: %.6f segundos\n", i + 1, tempos[i]);
+            if (tempos[i] > t_max)
+                t_max = tempos[i];
+            if (tempos[i] < t_min)
+                t_min = tempos[i];
+            t_total += tempos[i];
+        }
+
+        // Salvar tempos individuais
+        salvar_tempos_individuais_csv("todas_execucoes_c.csv", tamanho, caso, tempos, rep);
+
+        double m = mean(tempos, rep);
+        double s = stddev(tempos, rep, m);
+
+        double maximo = t_max;
+        double minimo = t_min;
+        double total = t_total;
+        salvar_resultado_csv("resultados_dijkstra_c.csv", tamanho, caso, m, maximo, minimo, total, s);
 
         printf("📊 Tempo médio: %.6f s, Desvio padrão: %.6f s\n", m, s);
         printf("⏱️ Tempo máximo: %.6f s, Tempo mínimo: %.6f s, Tempo total: %.6f s\n\n", t_max, t_min, t_total);
