@@ -1,8 +1,8 @@
 venv
-grafo
 .venv
+grafo
 
-Graphs/grafo_G_pior.json
+src/graphs/grafo_G_pior.json
 dijskra
 *.exe
 *.csv

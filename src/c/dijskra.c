@@ -265,8 +265,6 @@ int load_graph_from_json(const char *filename, Graph *g)
             add_edge(g, u, v, w);
             if (!directed)
                 add_edge(g, v, u, w); // Adiciona aresta inversa se não-direcionado
-
-            printf("Edging %d\n", src);
         }
     }
     free(id_to_idx);
@@ -447,11 +445,11 @@ int main()
         switch (opcao)
         {
         case 1:
-            arquivo = "Graphs/grafo_P_melhor.json";
+            arquivo = "src/graphs/grafo_P_melhor.json";
             nome_grafo = "🟢 Pequeno (Melhor caso)";
             break;
         case 2:
-            arquivo = "Graphs/grafo_P_medio.json";
+            arquivo = "src/graphs/grafo_P_medio.json";
             nome_grafo = "🟢 Pequeno (Caso médio)";
             break;
         case 3:
@@ -460,11 +458,11 @@ int main()
             arquivo = NULL;
             break;
         case 4:
-            arquivo = "Graphs/grafo_M_melhor.json";
+            arquivo = "src/graphs/grafo_M_melhor.json";
             nome_grafo = "🟡 Médio (Melhor caso)";
             break;
         case 5:
-            arquivo = "Graphs/grafo_M_medio.json";
+            arquivo = "src/graphs/grafo_M_medio.json";
             nome_grafo = "🟡 Médio (Caso médio)";
             break;
         case 6:
@@ -473,11 +471,11 @@ int main()
             arquivo = NULL;
             break;
         case 7:
-            arquivo = "Graphs/grafo_G_melhor.json";
+            arquivo = "src/graphs/grafo_G_melhor.json";
             nome_grafo = "🔴 Grande (Melhor caso)";
             break;
         case 8:
-            arquivo = "Graphs/grafo_G_medio.json";
+            arquivo = "src/graphs/grafo_G_medio.json";
             nome_grafo = "🔴 Grande (Caso médio)";
             break;
         case 9:
@@ -547,7 +545,7 @@ int main()
         }
 
         // Salvar tempos individuais
-        salvar_tempos_individuais_csv("todas_execucoes_c.csv", tamanho, caso, tempos, rep);
+        salvar_tempos_individuais_csv("src/results/todas_execucoes_c.csv", tamanho, caso, tempos, rep);
 
         double m = mean(tempos, rep);
         double s = stddev(tempos, rep, m);
@@ -555,7 +553,7 @@ int main()
         double maximo = t_max;
         double minimo = t_min;
         double total = t_total;
-        salvar_resultado_csv("resultados_dijkstra_c.csv", tamanho, caso, m, maximo, minimo, total, s);
+        salvar_resultado_csv("src/results/resultados_dijkstra_c.csv", tamanho, caso, m, maximo, minimo, total, s);
 
         printf("📊 Tempo médio: %.6f s, Desvio padrão: %.6f s\n", m, s);
         printf("⏱️ Tempo máximo: %.6f s, Tempo mínimo: %.6f s, Tempo total: %.6f s\n\n", t_max, t_min, t_total);
